@@ -1,6 +1,7 @@
-export const currencyFormatter = new Intl.NumberFormat('en-GB', {
+export const currencyFormatter = new Intl.NumberFormat('en-MM', {
   style: 'currency',
-  currency: 'GBP',
+  currency: 'MMK',
+  maximumFractionDigits: 0,
 });
 
 export const percentFormatter = new Intl.NumberFormat('en-GB', {

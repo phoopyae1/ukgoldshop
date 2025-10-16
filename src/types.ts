@@ -1,4 +1,4 @@
-export type Role = 'admin' | 'data-admin';
+export type Role = 'admin' | 'data-admin' | 'client';
 
 export interface GoldItem {
   id: string;

@@ -1,6 +1,7 @@
 import { Form, Formik } from 'formik';
 import { useEffect, useMemo, useState } from 'react';
 import * as Yup from 'yup';
+import { db } from './db';
 import {
   currencyFormatter,
   formatDateHuman,
@@ -34,6 +35,14 @@ interface LoginFormValues {
 const credentials: Record<Role, { username: string; password: string }> = {
   admin: { username: 'admin', password: 'admin123' },
   'data-admin': { username: 'dataman', password: 'data123' },
+  client: { username: 'client', password: 'client123' },
+};
+
+const roleLabels: Record<Role, string> = {
+  admin: 'Shop Admin',
+  'data-admin': 'Pawn Data Admin',
+  client: 'Client Viewer',
+};
 };
 
 const GOLD_STORAGE_KEY = 'ukgoldshop_inventory';
@@ -52,6 +61,9 @@ const pawnValidationSchema = Yup.object({
     .positive('Principal must be positive')
     .required('Principal is required'),
   interestRate: Yup.number()
+    .typeError('Enter an interest rate')
+    .positive('Interest rate must be positive')
+    .max(100, 'Interest rate is too high')
     .typeError('Select an interest rate')
     .min(0.005, 'Interest rate must be positive')
     .required('Interest rate is required'),
@@ -60,6 +72,7 @@ const pawnValidationSchema = Yup.object({
 });
 
 const loginValidationSchema = Yup.object({
+  role: Yup.mixed<Role>().oneOf(['admin', 'data-admin', 'client']).required(),
   role: Yup.mixed<Role>().oneOf(['admin', 'data-admin']).required(),
   username: Yup.string().required('Username is required'),
   password: Yup.string().required('Password is required'),
@@ -119,6 +132,36 @@ function calculateMonthlyMetrics(records: PawnRecord[], isoMonth: string): Daily
 
 export default function App(): JSX.Element {
   const [activeRole, setActiveRole] = useState<Role | null>(null);
+  const [goldItems, setGoldItems] = useState<GoldItem[]>([]);
+  const [pawnRecords, setPawnRecords] = useState<PawnRecord[]>([]);
+  const [loginError, setLoginError] = useState<string | null>(null);
+  const [dailyDate, setDailyDate] = useState<string>(() => getCurrentDateISO());
+  const [monthlySelection, setMonthlySelection] = useState<string>(() => getCurrentMonthISO());
+  const [isLoadingData, setIsLoadingData] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function bootstrap() {
+      try {
+        const [storedGold, storedPawn] = await Promise.all([
+          db.goldItems.toArray(),
+          db.pawnRecords.toArray(),
+        ]);
+        if (!cancelled) {
+          setGoldItems(storedGold);
+          setPawnRecords(storedPawn);
+        }
+      } finally {
+        if (!cancelled) {
+          setIsLoadingData(false);
+        }
+      }
+    }
+    bootstrap();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   const [goldItems, setGoldItems] = useState<GoldItem[]>(() => safeReadStorage(GOLD_STORAGE_KEY, []));
   const [pawnRecords, setPawnRecords] = useState<PawnRecord[]>(() => safeReadStorage(PAWN_STORAGE_KEY, []));
   const [loginError, setLoginError] = useState<string | null>(null);
@@ -182,6 +225,16 @@ export default function App(): JSX.Element {
       image: values.image,
       uploadedAt: new Date().toISOString(),
     };
+
+    await db.goldItems.put(newItem);
+    setGoldItems((prev) => [newItem, ...prev]);
+  };
+
+  const handlePawnSubmit = async (values: PawnFormValues) => {
+    const principal = Number(values.principal);
+    const interestRatePercent = Number(values.interestRate);
+    const term = Number(values.term);
+    const interestRate = interestRatePercent / 100;
     setGoldItems((prev) => [newItem, ...prev]);
     resetForm();
   };
@@ -205,6 +258,7 @@ export default function App(): JSX.Element {
       createdAt: new Date().toISOString(),
     };
 
+    await db.pawnRecords.put(newRecord);
     setPawnRecords((prev) => [newRecord, ...prev]);
     resetForm();
   };
@@ -220,6 +274,7 @@ export default function App(): JSX.Element {
           {activeRole && (
             <div className="flex items-center gap-4">
               <span className="rounded-full bg-brand-100 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-brand-700">
+                {roleLabels[activeRole]}
                 {activeRole === 'admin' ? 'Shop Admin' : 'Pawn Data Admin'}
               </span>
               <button type="button" onClick={handleLogout} className="bg-slate-900 hover:bg-slate-800">
@@ -249,6 +304,7 @@ export default function App(): JSX.Element {
                     <select id="role" name="role" value={values.role} onChange={handleChange}>
                       <option value="admin">Shop Admin</option>
                       <option value="data-admin">Pawn Data Admin</option>
+                      <option value="client">Client Viewer</option>
                     </select>
                   </div>
                   <div className="space-y-2">
@@ -284,6 +340,7 @@ export default function App(): JSX.Element {
                     <div>
                       <p>Shop Admin · admin / admin123</p>
                       <p>Pawn Data · dataman / data123</p>
+                      <p>Client Viewer · client / client123</p>
                     </div>
                   </div>
                   <button type="submit" className="w-full">Sign in</button>
@@ -294,6 +351,11 @@ export default function App(): JSX.Element {
         </div>
       ) : (
         <main className="mx-auto w-full max-w-6xl space-y-10 px-4 pb-16 pt-10">
+          {isLoadingData && (
+            <div className="rounded-2xl border border-dashed border-brand-200 bg-brand-50/60 px-4 py-3 text-sm text-brand-800">
+              Loading the latest records from the indexed database...
+            </div>
+          )}
           {activeRole === 'admin' ? (
             <section className="grid gap-8 lg:grid-cols-[1.1fr_1fr]">
               <div className="rounded-2xl border border-slate-200 bg-white p-8 shadow-xl">
@@ -311,6 +373,9 @@ export default function App(): JSX.Element {
                 <Formik<GoldFormValues>
                   initialValues={{ name: '', price: '', image: '' }}
                   validationSchema={goldValidationSchema}
+                  onSubmit={async (values, helpers) => {
+                    await handleGoldSubmit(values);
+                    helpers.resetForm();
                   onSubmit={(values, helpers) => {
                     handleGoldSubmit(values, () => helpers.resetForm());
                     helpers.setSubmitting(false);
@@ -332,6 +397,7 @@ export default function App(): JSX.Element {
                       </div>
                       <div className="grid gap-4 sm:grid-cols-2">
                         <div className="space-y-2">
+                        <label htmlFor="price">Price (MMK)</label>
                           <label htmlFor="price">Price (GBP)</label>
                           <input
                             id="price"
@@ -417,6 +483,44 @@ export default function App(): JSX.Element {
                 </div>
               </div>
             </section>
+          ) : activeRole === 'client' ? (
+            <section className="space-y-8">
+              <div className="rounded-2xl border border-slate-200 bg-white p-8 shadow-xl">
+                <div className="flex flex-wrap items-baseline justify-between gap-4">
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.3em] text-brand-600">Available gold</p>
+                    <h2 className="text-xl font-semibold text-slate-900">Latest showroom listings</h2>
+                    <p className="mt-1 text-sm text-slate-600">
+                      Review live prices (MMK) and imagery published by the admin team.
+                    </p>
+                  </div>
+                  <span className="rounded-full bg-brand-100 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-brand-700">
+                    Client view
+                  </span>
+                </div>
+              </div>
+              {sortedGold.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center text-sm text-slate-600">
+                  No gold has been published yet. Please check back soon.
+                </div>
+              ) : (
+                <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                  {sortedGold.map((item) => (
+                    <article key={item.id} className="flex h-full flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-lg">
+                      <img src={item.image} alt={item.name} className="h-48 w-full object-cover" />
+                      <div className="flex flex-1 flex-col gap-3 p-5">
+                        <div>
+                          <h3 className="text-lg font-semibold text-slate-900">{item.name}</h3>
+                          <p className="text-sm text-slate-500">Uploaded {formatDateShort(item.uploadedAt)}</p>
+                        </div>
+                        <p className="text-2xl font-bold text-brand-700">{currencyFormatter.format(item.price)}</p>
+                        <p className="text-xs text-slate-500">All prices shown in Myanmar Kyat (MMK).</p>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              )}
+            </section>
           ) : (
             <section className="space-y-10">
               <div className="grid gap-8 lg:grid-cols-[1.1fr_0.9fr]">
@@ -436,11 +540,23 @@ export default function App(): JSX.Element {
                     initialValues={{
                       customerName: '',
                       principal: '',
+                      interestRate: 2.5,
                       interestRate: interestOptions[2],
                       term: 6,
                       date: getCurrentDateISO(),
                     }}
                     validationSchema={pawnValidationSchema}
+                    onSubmit={async (values, helpers) => {
+                      await handlePawnSubmit(values);
+                      helpers.resetForm({
+                        values: {
+                          customerName: '',
+                          principal: '',
+                          interestRate: 2.5,
+                          term: 6,
+                          date: getCurrentDateISO(),
+                        },
+                      });
                     onSubmit={(values, helpers) => {
                       handlePawnSubmit(values, () =>
                         helpers.resetForm({
@@ -458,6 +574,8 @@ export default function App(): JSX.Element {
                   >
                     {({ values, setFieldValue, errors, touched }) => {
                       const principal = Number(values.principal) || 0;
+                      const interestRatePercent = Number(values.interestRate) || 0;
+                      const interestRate = interestRatePercent / 100;
                       const interestRate = Number(values.interestRate) || 0;
                       const term = Number(values.term) || 0;
                       const monthlyInterest = principal * interestRate;
@@ -481,7 +599,7 @@ export default function App(): JSX.Element {
                           </div>
                           <div className="grid gap-4 sm:grid-cols-2">
                             <div className="space-y-2">
-                              <label htmlFor="principal">Loan amount (GBP)</label>
+                              <label htmlFor="principal">Loan amount (MMK)</label>
                               <input
                                 id="principal"
                                 name="principal"
@@ -497,6 +615,21 @@ export default function App(): JSX.Element {
                             </div>
                             <div className="space-y-2">
                               <label htmlFor="interestRate">Interest % (per month)</label>
+                              <input
+                                id="interestRate"
+                                name="interestRate"
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                value={values.interestRate}
+                                onChange={(event) =>
+                                  setFieldValue(
+                                    'interestRate',
+                                    event.target.value === '' ? '' : Number(event.target.value),
+                                  )
+                                }
+                                aria-invalid={Boolean(touched.interestRate && errors.interestRate)}
+                              />
                               <select
                                 id="interestRate"
                                 name="interestRate"
