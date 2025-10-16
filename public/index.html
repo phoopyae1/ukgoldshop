@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UK Gold Shop Admin</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="app-shell">
+        <header class="app-header">
+            <h1>UK Gold Shop Admin Portal</h1>
+            <p class="tagline">Manage inventory, pawn records and daily performance in one place.</p>
+        </header>
+
+        <main>
+            <section id="login-section" class="card">
+                <h2>Sign in</h2>
+                <p class="section-intro">Choose your role to access the relevant dashboard.</p>
+                <form id="login-form" class="form-grid">
+                    <label>
+                        <span>Role</span>
+                        <select id="role" required>
+                            <option value="" disabled selected>Select your role</option>
+                            <option value="admin">Shop Admin</option>
+                            <option value="data-admin">Pawn Data Admin</option>
+                        </select>
+                    </label>
+                    <label>
+                        <span>Username</span>
+                        <input type="text" id="username" required placeholder="Enter username">
+                    </label>
+                    <label>
+                        <span>Password</span>
+                        <input type="password" id="password" required placeholder="Enter password">
+                    </label>
+                    <button type="submit" class="primary">Login</button>
+                    <p id="login-error" class="error hidden"></p>
+                </form>
+            </section>
+
+            <section id="admin-dashboard" class="card hidden">
+                <div class="section-header">
+                    <div>
+                        <h2>Shop Admin Dashboard</h2>
+                        <p class="section-intro">Upload gold products with the latest pricing to keep your storefront current.</p>
+                    </div>
+                    <button id="admin-logout" class="link-button">Sign out</button>
+                </div>
+
+                <form id="gold-form" class="form-grid">
+                    <label>
+                        <span>Gold item name</span>
+                        <input type="text" id="gold-name" required placeholder="e.g. 24k Necklace">
+                    </label>
+                    <label>
+                        <span>Gold price (£)</span>
+                        <input type="number" id="gold-price" min="0" step="0.01" required>
+                    </label>
+                    <label class="file-input">
+                        <span>Gold photo</span>
+                        <input type="file" id="gold-image" accept="image/*" required>
+                    </label>
+                    <button type="submit" class="primary">Upload gold item</button>
+                    <p id="gold-error" class="error hidden"></p>
+                </form>
+
+                <div class="table-wrapper">
+                    <h3>Uploaded inventory</h3>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Photo</th>
+                                <th>Name</th>
+                                <th>Price (£)</th>
+                                <th>Uploaded</th>
+                            </tr>
+                        </thead>
+                        <tbody id="gold-table"></tbody>
+                    </table>
+                </div>
+            </section>
+
+            <section id="data-dashboard" class="card hidden">
+                <div class="section-header">
+                    <div>
+                        <h2>Pawn Data Admin Dashboard</h2>
+                        <p class="section-intro">Record pawn transactions and monitor performance.</p>
+                    </div>
+                    <button id="data-logout" class="link-button">Sign out</button>
+                </div>
+
+                <form id="pawn-form" class="form-grid">
+                    <label>
+                        <span>Customer name</span>
+                        <input type="text" id="customer-name" required placeholder="e.g. Jane Doe">
+                    </label>
+                    <label>
+                        <span>Principal amount (£)</span>
+                        <input type="number" id="principal" min="0" step="0.01" required>
+                    </label>
+                    <label>
+                        <span>Interest rate</span>
+                        <select id="interest-rate" required>
+                            <option value="" disabled selected>Select rate</option>
+                            <option value="0.02">2% monthly</option>
+                            <option value="0.025">2.5% monthly</option>
+                            <option value="0.03">3% monthly</option>
+                            <option value="0.035">3.5% monthly</option>
+                        </select>
+                    </label>
+                    <label>
+                        <span>Pawn date</span>
+                        <input type="date" id="pawn-date" required>
+                    </label>
+                    <label>
+                        <span>Loan term (months)</span>
+                        <input type="number" id="loan-term" min="1" max="24" value="6">
+                    </label>
+                    <div class="calculation">
+                        <div>
+                            <p class="calc-label">Monthly interest (£)</p>
+                            <p id="monthly-interest" class="calc-value">0.00</p>
+                        </div>
+                        <div>
+                            <p class="calc-label">Total repayable (£)</p>
+                            <p id="total-payable" class="calc-value">0.00</p>
+                        </div>
+                    </div>
+                    <button type="submit" class="primary">Save pawn record</button>
+                    <p id="pawn-error" class="error hidden"></p>
+                </form>
+
+                <div class="table-wrapper">
+                    <h3>Pawn records</h3>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Customer</th>
+                                <th>Principal (£)</th>
+                                <th>Interest %</th>
+                                <th>Monthly interest (£)</th>
+                                <th>Total repayable (£)</th>
+                                <th>Date</th>
+                                <th>Term (months)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="pawn-table"></tbody>
+                    </table>
+                </div>
+
+                <div class="analysis-grid">
+                    <article class="analysis-card">
+                        <h3>Daily analysis</h3>
+                        <p class="analysis-subtitle">Performance for <span id="analysis-day"></span></p>
+                        <dl>
+                            <div>
+                                <dt>Pawn count</dt>
+                                <dd id="daily-count">0</dd>
+                            </div>
+                            <div>
+                                <dt>Total principal (£)</dt>
+                                <dd id="daily-principal">0.00</dd>
+                            </div>
+                            <div>
+                                <dt>Total interest (£)</dt>
+                                <dd id="daily-interest">0.00</dd>
+                            </div>
+                        </dl>
+                    </article>
+
+                    <article class="analysis-card">
+                        <h3>Monthly analysis</h3>
+                        <p class="analysis-subtitle">Select a month to explore performance.</p>
+                        <label class="month-picker">
+                            <span>Month</span>
+                            <input type="month" id="analysis-month">
+                        </label>
+                        <dl>
+                            <div>
+                                <dt>Pawn count</dt>
+                                <dd id="monthly-count">0</dd>
+                            </div>
+                            <div>
+                                <dt>Total principal (£)</dt>
+                                <dd id="monthly-principal">0.00</dd>
+                            </div>
+                            <div>
+                                <dt>Total interest (£)</dt>
+                                <dd id="monthly-interest">0.00</dd>
+                            </div>
+                        </dl>
+                    </article>
+                </div>
+            </section>
+        </main>
+
+        <footer>
+            <small>© <span id="year"></span> UK Gold Shop. Internal use only.</small>
+        </footer>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

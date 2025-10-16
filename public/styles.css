@@ -1,0 +1,262 @@
+:root {
+    color-scheme: light;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    line-height: 1.6;
+    --surface: #ffffff;
+    --surface-soft: #f5f7fb;
+    --primary: #c19a24;
+    --primary-dark: #8a701b;
+    --text: #1f2933;
+    --muted: #52606d;
+    --border: #d9e2ec;
+    --shadow: rgba(15, 23, 42, 0.08);
+    background: #eef2f8;
+    color: var(--text);
+}
+
+body {
+    margin: 0;
+    min-height: 100vh;
+}
+
+.app-shell {
+    max-width: 1080px;
+    margin: 0 auto;
+    padding: 3rem 1.25rem 4rem;
+}
+
+.app-header {
+    text-align: center;
+    margin-bottom: 2.5rem;
+}
+
+.app-header h1 {
+    margin: 0;
+    font-size: 2.5rem;
+    letter-spacing: 0.02em;
+}
+
+.tagline {
+    margin-top: 0.75rem;
+    color: var(--muted);
+    font-size: 1rem;
+}
+
+.card {
+    background: var(--surface);
+    border-radius: 18px;
+    padding: 2rem;
+    box-shadow: 0 18px 40px -28px var(--shadow);
+    margin-bottom: 2rem;
+}
+
+.section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.section-header h2 {
+    margin: 0;
+}
+
+.section-intro {
+    color: var(--muted);
+    margin-top: 0.35rem;
+}
+
+.form-grid {
+    display: grid;
+    gap: 1.25rem;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    margin-bottom: 2rem;
+}
+
+label {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    font-weight: 600;
+    color: var(--muted);
+}
+
+input,
+select,
+button {
+    font: inherit;
+}
+
+input,
+select {
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    padding: 0.65rem 0.85rem;
+    background: var(--surface);
+    color: var(--text);
+}
+
+input:focus,
+select:focus {
+    outline: 3px solid rgba(193, 154, 36, 0.2);
+}
+
+input[type="file"] {
+    padding: 0.5rem 0;
+}
+
+.file-input {
+    align-self: end;
+}
+
+button.primary {
+    grid-column: 1 / -1;
+    padding: 0.85rem 1.5rem;
+    background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+    color: #fff;
+    border: none;
+    border-radius: 999px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+button.primary:hover,
+button.primary:focus-visible {
+    transform: translateY(-1px);
+    box-shadow: 0 12px 30px -20px rgba(193, 154, 36, 0.8);
+}
+
+button.primary:active {
+    transform: translateY(0);
+}
+
+.link-button {
+    background: none;
+    border: none;
+    color: var(--primary-dark);
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.error {
+    color: #b73239;
+    background: #fde7e9;
+    border: 1px solid #f6c8cc;
+    padding: 0.65rem 0.75rem;
+    border-radius: 10px;
+}
+
+.muted {
+    color: var(--muted);
+    text-align: center;
+}
+
+.hidden {
+    display: none !important;
+}
+
+.table-wrapper {
+    overflow-x: auto;
+}
+
+.table-wrapper table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.table-wrapper th,
+.table-wrapper td {
+    padding: 0.85rem;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.95rem;
+}
+
+.table-wrapper th {
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-size: 0.8rem;
+}
+
+.table-wrapper img {
+    width: 60px;
+    height: 60px;
+    object-fit: cover;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+}
+
+.calculation {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 1rem;
+    align-items: center;
+}
+
+.calc-label {
+    font-size: 0.85rem;
+    color: var(--muted);
+    margin: 0;
+}
+
+.calc-value {
+    font-size: 1.4rem;
+    font-weight: 700;
+    margin: 0;
+}
+
+.analysis-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 1.5rem;
+}
+
+.analysis-card {
+    background: var(--surface-soft);
+    border-radius: 16px;
+    padding: 1.5rem;
+    border: 1px solid rgba(82, 96, 109, 0.08);
+}
+
+.analysis-card h3 {
+    margin-top: 0;
+}
+
+.analysis-subtitle {
+    color: var(--muted);
+    margin-top: 0.35rem;
+    margin-bottom: 1rem;
+}
+
+dl {
+    margin: 0;
+    display: grid;
+    gap: 0.75rem;
+}
+
+dl div {
+    display: flex;
+    justify-content: space-between;
+    border-bottom: 1px dashed rgba(82, 96, 109, 0.2);
+    padding-bottom: 0.4rem;
+}
+
+footer {
+    text-align: center;
+    margin-top: 3rem;
+    color: var(--muted);
+    font-size: 0.85rem;
+}
+
+@media (max-width: 640px) {
+    .app-header h1 {
+        font-size: 2rem;
+    }
+
+    .card {
+        padding: 1.5rem;
+    }
+}
