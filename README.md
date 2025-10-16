@@ -1,10 +1,9 @@
 # UK Gold Shop Admin Portal
 
-A multi-role portal built with React, TypeScript, Tailwind CSS, and Formik. It enables a gold shop to manage sales inventory, pawn transactions, and client-facing listings from purpose-built workspaces:
+A dual-role admin portal built with React, TypeScript, Tailwind CSS, and Formik. It enables a gold shop to manage sales inventory and pawn transactions from purpose-built workspaces:
 
-- **Shop Admin** – upload gold product photos, capture MMK pricing, and maintain an inventory catalogue backed by IndexedDB storage.
+- **Shop Admin** – upload gold product photos, capture price information, and maintain an inventory catalogue.
 - **Pawn Data Admin** – record pawn pledges, automatically calculate interest, and review daily or monthly performance insights.
-- **Client Viewer** – browse the published gold catalogue with live MMK prices and imagery sourced from the admin uploads.
 
 ## Getting started
 
@@ -20,9 +19,8 @@ A multi-role portal built with React, TypeScript, Tailwind CSS, and Formik. It e
 3. Use one of the bundled accounts to sign in:
    - **Shop Admin:** username `admin`, password `admin123`
    - **Pawn Data Admin:** username `dataman`, password `data123`
-   - **Client Viewer:** username `client`, password `client123`
 
-> **Note:** All information is saved in your browser's IndexedDB via Dexie, so the data stays on the device you use the portal from. Clear your browser data to reset the app.
+> **Note:** All information is saved in your browser's `localStorage`, so the data stays on the device you use the portal from. Clear your browser data to reset the app.
 
 ## Available scripts
 
@@ -34,18 +32,14 @@ A multi-role portal built with React, TypeScript, Tailwind CSS, and Formik. It e
 
 ### Shop Admin workspace
 - Upload gold product photos with an inline preview before saving.
-- Capture product names and MMK prices using validated Formik forms.
+- Capture product names and GBP prices using validated Formik forms.
 - Review the inventory in a pageless, scrollable table with recent items first.
 
 ### Pawn Data Admin workspace
-- Record pawn transactions with Formik + Yup validation and free-form interest percentages.
+- Record pawn transactions with Formik + Yup validation and selectable interest rates.
 - Automatic monthly interest and total repayment calculations as you update the form.
 - Daily and monthly analytics cards with adjustable date/month filters.
 - Full transaction history with currency and percentage formatting for quick audits.
-
-### Client Viewer workspace
-- Browse a responsive card grid that showcases each gold item with imagery, price, and upload date.
-- Prices are formatted in Myanmar Kyat (MMK) for immediate client reference.
 
 ## Tech stack
 
@@ -53,3 +47,41 @@ A multi-role portal built with React, TypeScript, Tailwind CSS, and Formik. It e
 - **Tailwind CSS** for utility-first styling.
 - **Formik & Yup** for forms, validation, and calculated summaries.
 - **Vite** for fast local development and builds.
+A lightweight web dashboard that helps a gold shop manage product listings and pawn transactions. The portal offers two dedicated workspaces:
+
+- **Shop Admin** – upload gold product photos, capture price information and maintain an up-to-date inventory catalogue.
+- **Pawn Data Admin** – capture pawn customer details, automatically calculate interest, and review daily and monthly performance insights.
+
+## Getting started
+
+1. Open the `public/index.html` file in a modern web browser (Chrome, Edge, Safari or Firefox).
+2. Sign in with one of the built-in accounts:
+   - **Shop Admin:** username `admin`, password `admin123`
+   - **Pawn Data Admin:** username `dataman`, password `data123`
+3. Begin managing gold items or pawn records from the relevant dashboard.
+
+> **Note:** All information is saved in your browser's `localStorage` so the data stays on the device you use the portal from. Clear your browser data to reset the app.
+
+## Features
+
+### Shop Admin workspace
+- Upload gold product photos (images smaller than 2 MB).
+- Record product names and prices.
+- View a tabular inventory with upload dates.
+
+### Pawn Data Admin workspace
+- Capture pawn transactions with customer name, principal amount, interest rate and term.
+- Automatic monthly interest and total repayment calculation as you type.
+- View all pawn records in a sortable table (latest first).
+- Daily analysis card showing pawn count, principal and interest for the selected day.
+- Monthly analysis card with totals filtered by the chosen calendar month.
+
+## Development
+
+This project is a static web application. You can customise styles or behaviour by editing the files in the `public/` directory:
+
+- `index.html` – markup and layout
+- `styles.css` – visual design
+- `app.js` – interactivity and local data storage
+
+You can serve the `public/` folder with any static web server if preferred (for example `npx serve public`).

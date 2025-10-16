@@ -43,6 +43,10 @@ const roleLabels: Record<Role, string> = {
   'data-admin': 'Pawn Data Admin',
   client: 'Client Viewer',
 };
+};
+
+const GOLD_STORAGE_KEY = 'ukgoldshop_inventory';
+const PAWN_STORAGE_KEY = 'ukgoldshop_pawn_records';
 
 const goldValidationSchema = Yup.object({
   name: Yup.string().required('Gold name is required'),
@@ -60,6 +64,8 @@ const pawnValidationSchema = Yup.object({
     .typeError('Enter an interest rate')
     .positive('Interest rate must be positive')
     .max(100, 'Interest rate is too high')
+    .typeError('Select an interest rate')
+    .min(0.005, 'Interest rate must be positive')
     .required('Interest rate is required'),
   term: Yup.number().typeError('Term must be a number').min(1, 'Term must be at least 1 month').required('Loan term is required'),
   date: Yup.string().required('Transaction date is required'),
@@ -67,9 +73,12 @@ const pawnValidationSchema = Yup.object({
 
 const loginValidationSchema = Yup.object({
   role: Yup.mixed<Role>().oneOf(['admin', 'data-admin', 'client']).required(),
+  role: Yup.mixed<Role>().oneOf(['admin', 'data-admin']).required(),
   username: Yup.string().required('Username is required'),
   password: Yup.string().required('Password is required'),
 });
+
+const interestOptions = [0.015, 0.02, 0.025, 0.03, 0.035, 0.04];
 
 function encodeFile(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -78,6 +87,21 @@ function encodeFile(file: File): Promise<string> {
     reader.onerror = (error) => reject(error);
     reader.readAsDataURL(file);
   });
+}
+
+function safeReadStorage<T>(key: string, fallback: T): T {
+  if (typeof window === 'undefined') {
+    return fallback;
+  }
+
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return fallback;
+    return JSON.parse(raw) as T;
+  } catch (error) {
+    console.error(`Unable to parse storage key ${key}`, error);
+    return fallback;
+  }
 }
 
 function calculateDailyMetrics(records: PawnRecord[], isoDate: string): DailyMetrics {
@@ -138,6 +162,21 @@ export default function App(): JSX.Element {
       cancelled = true;
     };
   }, []);
+  const [goldItems, setGoldItems] = useState<GoldItem[]>(() => safeReadStorage(GOLD_STORAGE_KEY, []));
+  const [pawnRecords, setPawnRecords] = useState<PawnRecord[]>(() => safeReadStorage(PAWN_STORAGE_KEY, []));
+  const [loginError, setLoginError] = useState<string | null>(null);
+  const [dailyDate, setDailyDate] = useState<string>(() => getCurrentDateISO());
+  const [monthlySelection, setMonthlySelection] = useState<string>(() => getCurrentMonthISO());
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    localStorage.setItem(GOLD_STORAGE_KEY, JSON.stringify(goldItems));
+  }, [goldItems]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    localStorage.setItem(PAWN_STORAGE_KEY, JSON.stringify(pawnRecords));
+  }, [pawnRecords]);
 
   const dailyMetrics = useMemo(() => calculateDailyMetrics(pawnRecords, dailyDate), [pawnRecords, dailyDate]);
   const monthlyMetrics = useMemo(
@@ -178,7 +217,7 @@ export default function App(): JSX.Element {
     setActiveRole(null);
   };
 
-  const handleGoldSubmit = async (values: GoldFormValues) => {
+  const handleGoldSubmit = (values: GoldFormValues, resetForm: () => void) => {
     const newItem: GoldItem = {
       id: crypto.randomUUID(),
       name: values.name.trim(),
@@ -196,6 +235,14 @@ export default function App(): JSX.Element {
     const interestRatePercent = Number(values.interestRate);
     const term = Number(values.term);
     const interestRate = interestRatePercent / 100;
+    setGoldItems((prev) => [newItem, ...prev]);
+    resetForm();
+  };
+
+  const handlePawnSubmit = (values: PawnFormValues, resetForm: () => void) => {
+    const principal = Number(values.principal);
+    const interestRate = Number(values.interestRate);
+    const term = Number(values.term);
     const monthlyInterest = principal * interestRate;
     const totalPayable = principal + monthlyInterest * term;
 
@@ -213,6 +260,7 @@ export default function App(): JSX.Element {
 
     await db.pawnRecords.put(newRecord);
     setPawnRecords((prev) => [newRecord, ...prev]);
+    resetForm();
   };
 
   return (
@@ -227,6 +275,7 @@ export default function App(): JSX.Element {
             <div className="flex items-center gap-4">
               <span className="rounded-full bg-brand-100 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-brand-700">
                 {roleLabels[activeRole]}
+                {activeRole === 'admin' ? 'Shop Admin' : 'Pawn Data Admin'}
               </span>
               <button type="button" onClick={handleLogout} className="bg-slate-900 hover:bg-slate-800">
                 Logout
@@ -327,6 +376,8 @@ export default function App(): JSX.Element {
                   onSubmit={async (values, helpers) => {
                     await handleGoldSubmit(values);
                     helpers.resetForm();
+                  onSubmit={(values, helpers) => {
+                    handleGoldSubmit(values, () => helpers.resetForm());
                     helpers.setSubmitting(false);
                   }}
                 >
@@ -347,6 +398,7 @@ export default function App(): JSX.Element {
                       <div className="grid gap-4 sm:grid-cols-2">
                         <div className="space-y-2">
                         <label htmlFor="price">Price (MMK)</label>
+                          <label htmlFor="price">Price (GBP)</label>
                           <input
                             id="price"
                             name="price"
@@ -489,6 +541,7 @@ export default function App(): JSX.Element {
                       customerName: '',
                       principal: '',
                       interestRate: 2.5,
+                      interestRate: interestOptions[2],
                       term: 6,
                       date: getCurrentDateISO(),
                     }}
@@ -504,6 +557,18 @@ export default function App(): JSX.Element {
                           date: getCurrentDateISO(),
                         },
                       });
+                    onSubmit={(values, helpers) => {
+                      handlePawnSubmit(values, () =>
+                        helpers.resetForm({
+                          values: {
+                            customerName: '',
+                            principal: '',
+                            interestRate: interestOptions[2],
+                            term: 6,
+                            date: getCurrentDateISO(),
+                          },
+                        }),
+                      );
                       helpers.setSubmitting(false);
                     }}
                   >
@@ -511,6 +576,7 @@ export default function App(): JSX.Element {
                       const principal = Number(values.principal) || 0;
                       const interestRatePercent = Number(values.interestRate) || 0;
                       const interestRate = interestRatePercent / 100;
+                      const interestRate = Number(values.interestRate) || 0;
                       const term = Number(values.term) || 0;
                       const monthlyInterest = principal * interestRate;
                       const totalPayable = principal + monthlyInterest * term;
@@ -564,6 +630,21 @@ export default function App(): JSX.Element {
                                 }
                                 aria-invalid={Boolean(touched.interestRate && errors.interestRate)}
                               />
+                              <select
+                                id="interestRate"
+                                name="interestRate"
+                                value={values.interestRate}
+                                onChange={(event) => setFieldValue('interestRate', Number(event.target.value))}
+                              >
+                                <option value="" disabled>
+                                  Select rate
+                                </option>
+                                {interestOptions.map((rate) => (
+                                  <option key={rate} value={rate}>
+                                    {percentFormatter.format(rate)}
+                                  </option>
+                                ))}
+                              </select>
                               {touched.interestRate && errors.interestRate && (
                                 <p className="text-sm text-rose-600">{errors.interestRate}</p>
                               )}
