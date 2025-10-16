@@ -1,0 +1,35 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  @apply text-slate-900 antialiased;
+}
+
+input, select, textarea {
+  @apply rounded-md border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200;
+}
+
+label {
+  @apply text-sm font-medium text-slate-700;
+}
+
+button {
+  @apply inline-flex items-center justify-center rounded-md bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-700 focus:outline-none focus:ring-2 focus:ring-brand-300 focus:ring-offset-2;
+}
+
+.table-card {
+  @apply w-full overflow-hidden rounded-xl border border-slate-200 bg-white shadow;
+}
+
+.table-card table {
+  @apply min-w-full divide-y divide-slate-200;
+}
+
+.table-card th {
+  @apply bg-slate-50 px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-600;
+}
+
+.table-card td {
+  @apply px-4 py-3 text-sm text-slate-700;
+}
