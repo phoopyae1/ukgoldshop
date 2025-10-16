@@ -43,7 +43,6 @@ const roleLabels: Record<Role, string> = {
   'data-admin': 'Pawn Data Admin',
   client: 'Client Viewer',
 };
-};
 
 const GOLD_STORAGE_KEY = 'ukgoldshop_inventory';
 const PAWN_STORAGE_KEY = 'ukgoldshop_pawn_records';
@@ -73,7 +72,6 @@ const pawnValidationSchema = Yup.object({
 
 const loginValidationSchema = Yup.object({
   role: Yup.mixed<Role>().oneOf(['admin', 'data-admin', 'client']).required(),
-  role: Yup.mixed<Role>().oneOf(['admin', 'data-admin']).required(),
   username: Yup.string().required('Username is required'),
   password: Yup.string().required('Password is required'),
 });
@@ -162,21 +160,6 @@ export default function App(): JSX.Element {
       cancelled = true;
     };
   }, []);
-  const [goldItems, setGoldItems] = useState<GoldItem[]>(() => safeReadStorage(GOLD_STORAGE_KEY, []));
-  const [pawnRecords, setPawnRecords] = useState<PawnRecord[]>(() => safeReadStorage(PAWN_STORAGE_KEY, []));
-  const [loginError, setLoginError] = useState<string | null>(null);
-  const [dailyDate, setDailyDate] = useState<string>(() => getCurrentDateISO());
-  const [monthlySelection, setMonthlySelection] = useState<string>(() => getCurrentMonthISO());
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    localStorage.setItem(GOLD_STORAGE_KEY, JSON.stringify(goldItems));
-  }, [goldItems]);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    localStorage.setItem(PAWN_STORAGE_KEY, JSON.stringify(pawnRecords));
-  }, [pawnRecords]);
 
   const dailyMetrics = useMemo(() => calculateDailyMetrics(pawnRecords, dailyDate), [pawnRecords, dailyDate]);
   const monthlyMetrics = useMemo(
@@ -217,7 +200,7 @@ export default function App(): JSX.Element {
     setActiveRole(null);
   };
 
-  const handleGoldSubmit = (values: GoldFormValues, resetForm: () => void) => {
+  const handleGoldSubmit = async (values: GoldFormValues) => {
     const newItem: GoldItem = {
       id: crypto.randomUUID(),
       name: values.name.trim(),
@@ -231,15 +214,6 @@ export default function App(): JSX.Element {
   };
 
   const handlePawnSubmit = async (values: PawnFormValues) => {
-    const principal = Number(values.principal);
-    const interestRatePercent = Number(values.interestRate);
-    const term = Number(values.term);
-    const interestRate = interestRatePercent / 100;
-    setGoldItems((prev) => [newItem, ...prev]);
-    resetForm();
-  };
-
-  const handlePawnSubmit = (values: PawnFormValues, resetForm: () => void) => {
     const principal = Number(values.principal);
     const interestRate = Number(values.interestRate);
     const term = Number(values.term);
@@ -260,7 +234,6 @@ export default function App(): JSX.Element {
 
     await db.pawnRecords.put(newRecord);
     setPawnRecords((prev) => [newRecord, ...prev]);
-    resetForm();
   };
 
   return (
@@ -275,7 +248,6 @@ export default function App(): JSX.Element {
             <div className="flex items-center gap-4">
               <span className="rounded-full bg-brand-100 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-brand-700">
                 {roleLabels[activeRole]}
-                {activeRole === 'admin' ? 'Shop Admin' : 'Pawn Data Admin'}
               </span>
               <button type="button" onClick={handleLogout} className="bg-slate-900 hover:bg-slate-800">
                 Logout
@@ -376,9 +348,6 @@ export default function App(): JSX.Element {
                   onSubmit={async (values, helpers) => {
                     await handleGoldSubmit(values);
                     helpers.resetForm();
-                  onSubmit={(values, helpers) => {
-                    handleGoldSubmit(values, () => helpers.resetForm());
-                    helpers.setSubmitting(false);
                   }}
                 >
                   {({ values, setFieldValue, errors, touched, isSubmitting }) => (
@@ -397,8 +366,7 @@ export default function App(): JSX.Element {
                       </div>
                       <div className="grid gap-4 sm:grid-cols-2">
                         <div className="space-y-2">
-                        <label htmlFor="price">Price (MMK)</label>
-                          <label htmlFor="price">Price (GBP)</label>
+                          <label htmlFor="price">Price (MMK)</label>
                           <input
                             id="price"
                             name="price"
@@ -540,7 +508,6 @@ export default function App(): JSX.Element {
                     initialValues={{
                       customerName: '',
                       principal: '',
-                      interestRate: 2.5,
                       interestRate: interestOptions[2],
                       term: 6,
                       date: getCurrentDateISO(),
@@ -552,30 +519,15 @@ export default function App(): JSX.Element {
                         values: {
                           customerName: '',
                           principal: '',
-                          interestRate: 2.5,
+                          interestRate: interestOptions[2],
                           term: 6,
                           date: getCurrentDateISO(),
                         },
                       });
-                    onSubmit={(values, helpers) => {
-                      handlePawnSubmit(values, () =>
-                        helpers.resetForm({
-                          values: {
-                            customerName: '',
-                            principal: '',
-                            interestRate: interestOptions[2],
-                            term: 6,
-                            date: getCurrentDateISO(),
-                          },
-                        }),
-                      );
-                      helpers.setSubmitting(false);
                     }}
                   >
                     {({ values, setFieldValue, errors, touched }) => {
                       const principal = Number(values.principal) || 0;
-                      const interestRatePercent = Number(values.interestRate) || 0;
-                      const interestRate = interestRatePercent / 100;
                       const interestRate = Number(values.interestRate) || 0;
                       const term = Number(values.term) || 0;
                       const monthlyInterest = principal * interestRate;
@@ -615,21 +567,6 @@ export default function App(): JSX.Element {
                             </div>
                             <div className="space-y-2">
                               <label htmlFor="interestRate">Interest % (per month)</label>
-                              <input
-                                id="interestRate"
-                                name="interestRate"
-                                type="number"
-                                min="0"
-                                step="0.01"
-                                value={values.interestRate}
-                                onChange={(event) =>
-                                  setFieldValue(
-                                    'interestRate',
-                                    event.target.value === '' ? '' : Number(event.target.value),
-                                  )
-                                }
-                                aria-invalid={Boolean(touched.interestRate && errors.interestRate)}
-                              />
                               <select
                                 id="interestRate"
                                 name="interestRate"
