@@ -13,11 +13,13 @@ export interface PawnRecord {
   customerName: string;
   principal: number;
   interestRate: number;
-  term: number;
   monthlyInterest: number;
+  daysBorrowed: number;
+  interestAccrued: number;
   totalPayable: number;
   date: string;
   createdAt: string;
+  term?: number;
 }
 
 export interface DailyMetrics {

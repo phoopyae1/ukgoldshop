@@ -22,7 +22,7 @@ interface PawnFormValues {
   customerName: string;
   principal: number | '';
   interestRate: number | '';
-  term: number | '';
+  daysBorrowed: number | '';
   date: string;
 }
 
@@ -43,10 +43,6 @@ const roleLabels: Record<Role, string> = {
   'data-admin': 'Pawn Data Admin',
   client: 'Client Viewer',
 };
-};
-
-const GOLD_STORAGE_KEY = 'ukgoldshop_inventory';
-const PAWN_STORAGE_KEY = 'ukgoldshop_pawn_records';
 
 const goldValidationSchema = Yup.object({
   name: Yup.string().required('Gold name is required'),
@@ -61,19 +57,20 @@ const pawnValidationSchema = Yup.object({
     .positive('Principal must be positive')
     .required('Principal is required'),
   interestRate: Yup.number()
-    .typeError('Enter an interest rate')
-    .positive('Interest rate must be positive')
-    .max(100, 'Interest rate is too high')
     .typeError('Select an interest rate')
-    .min(0.005, 'Interest rate must be positive')
+    .positive('Interest rate must be positive')
+    .max(1, 'Interest rate is too high')
     .required('Interest rate is required'),
-  term: Yup.number().typeError('Term must be a number').min(1, 'Term must be at least 1 month').required('Loan term is required'),
+  daysBorrowed: Yup.number()
+    .typeError('Days borrowed must be a number')
+    .integer('Days borrowed must be a whole number')
+    .min(1, 'Days borrowed must be at least 1 day')
+    .required('Days borrowed is required'),
   date: Yup.string().required('Transaction date is required'),
 });
 
 const loginValidationSchema = Yup.object({
   role: Yup.mixed<Role>().oneOf(['admin', 'data-admin', 'client']).required(),
-  role: Yup.mixed<Role>().oneOf(['admin', 'data-admin']).required(),
   username: Yup.string().required('Username is required'),
   password: Yup.string().required('Password is required'),
 });
@@ -89,28 +86,17 @@ function encodeFile(file: File): Promise<string> {
   });
 }
 
-function safeReadStorage<T>(key: string, fallback: T): T {
-  if (typeof window === 'undefined') {
-    return fallback;
-  }
-
-  try {
-    const raw = localStorage.getItem(key);
-    if (!raw) return fallback;
-    return JSON.parse(raw) as T;
-  } catch (error) {
-    console.error(`Unable to parse storage key ${key}`, error);
-    return fallback;
-  }
-}
-
 function calculateDailyMetrics(records: PawnRecord[], isoDate: string): DailyMetrics {
   const matches = records.filter((record) => record.date === isoDate);
   return matches.reduce<DailyMetrics>(
     (acc, record) => {
       acc.count += 1;
       acc.principal += record.principal;
-      acc.interest += record.monthlyInterest * record.term;
+      const interestValue =
+        typeof record.interestAccrued === 'number'
+          ? record.interestAccrued
+          : record.monthlyInterest * (record.term ?? 0);
+      acc.interest += interestValue;
       return acc;
     },
     { count: 0, principal: 0, interest: 0 },
@@ -123,7 +109,11 @@ function calculateMonthlyMetrics(records: PawnRecord[], isoMonth: string): Daily
     (acc, record) => {
       acc.count += 1;
       acc.principal += record.principal;
-      acc.interest += record.monthlyInterest * record.term;
+      const interestValue =
+        typeof record.interestAccrued === 'number'
+          ? record.interestAccrued
+          : record.monthlyInterest * (record.term ?? 0);
+      acc.interest += interestValue;
       return acc;
     },
     { count: 0, principal: 0, interest: 0 },
@@ -162,22 +152,6 @@ export default function App(): JSX.Element {
       cancelled = true;
     };
   }, []);
-  const [goldItems, setGoldItems] = useState<GoldItem[]>(() => safeReadStorage(GOLD_STORAGE_KEY, []));
-  const [pawnRecords, setPawnRecords] = useState<PawnRecord[]>(() => safeReadStorage(PAWN_STORAGE_KEY, []));
-  const [loginError, setLoginError] = useState<string | null>(null);
-  const [dailyDate, setDailyDate] = useState<string>(() => getCurrentDateISO());
-  const [monthlySelection, setMonthlySelection] = useState<string>(() => getCurrentMonthISO());
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    localStorage.setItem(GOLD_STORAGE_KEY, JSON.stringify(goldItems));
-  }, [goldItems]);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    localStorage.setItem(PAWN_STORAGE_KEY, JSON.stringify(pawnRecords));
-  }, [pawnRecords]);
-
   const dailyMetrics = useMemo(() => calculateDailyMetrics(pawnRecords, dailyDate), [pawnRecords, dailyDate]);
   const monthlyMetrics = useMemo(
     () => calculateMonthlyMetrics(pawnRecords, monthlySelection),
@@ -217,7 +191,7 @@ export default function App(): JSX.Element {
     setActiveRole(null);
   };
 
-  const handleGoldSubmit = (values: GoldFormValues, resetForm: () => void) => {
+  const handleGoldSubmit = async (values: GoldFormValues, resetForm: () => void) => {
     const newItem: GoldItem = {
       id: crypto.randomUUID(),
       name: values.name.trim(),
@@ -228,31 +202,25 @@ export default function App(): JSX.Element {
 
     await db.goldItems.put(newItem);
     setGoldItems((prev) => [newItem, ...prev]);
-  };
-
-  const handlePawnSubmit = async (values: PawnFormValues) => {
-    const principal = Number(values.principal);
-    const interestRatePercent = Number(values.interestRate);
-    const term = Number(values.term);
-    const interestRate = interestRatePercent / 100;
-    setGoldItems((prev) => [newItem, ...prev]);
     resetForm();
   };
 
-  const handlePawnSubmit = (values: PawnFormValues, resetForm: () => void) => {
+  const handlePawnSubmit = async (values: PawnFormValues, resetForm: () => void) => {
     const principal = Number(values.principal);
     const interestRate = Number(values.interestRate);
-    const term = Number(values.term);
+    const daysBorrowed = Number(values.daysBorrowed);
     const monthlyInterest = principal * interestRate;
-    const totalPayable = principal + monthlyInterest * term;
+    const interestAccrued = principal * (interestRate / 30) * daysBorrowed;
+    const totalPayable = principal + interestAccrued;
 
     const newRecord: PawnRecord = {
       id: crypto.randomUUID(),
       customerName: values.customerName.trim(),
       principal,
       interestRate,
-      term,
       monthlyInterest,
+      daysBorrowed,
+      interestAccrued,
       totalPayable,
       date: values.date,
       createdAt: new Date().toISOString(),
@@ -374,10 +342,7 @@ export default function App(): JSX.Element {
                   initialValues={{ name: '', price: '', image: '' }}
                   validationSchema={goldValidationSchema}
                   onSubmit={async (values, helpers) => {
-                    await handleGoldSubmit(values);
-                    helpers.resetForm();
-                  onSubmit={(values, helpers) => {
-                    handleGoldSubmit(values, () => helpers.resetForm());
+                    await handleGoldSubmit(values, () => helpers.resetForm());
                     helpers.setSubmitting(false);
                   }}
                 >
@@ -397,8 +362,7 @@ export default function App(): JSX.Element {
                       </div>
                       <div className="grid gap-4 sm:grid-cols-2">
                         <div className="space-y-2">
-                        <label htmlFor="price">Price (MMK)</label>
-                          <label htmlFor="price">Price (GBP)</label>
+                          <label htmlFor="price">Price (MMK)</label>
                           <input
                             id="price"
                             name="price"
@@ -529,7 +493,7 @@ export default function App(): JSX.Element {
                     <div>
                       <h2 className="text-xl font-semibold text-slate-900">Capture pawn transaction</h2>
                       <p className="mt-1 text-sm text-slate-600">
-                        Store customer pledges with automatic monthly interest calculations.
+                        Store customer pledges with automatic interest calculations based on the days borrowed.
                       </p>
                     </div>
                     <span className="rounded-full bg-brand-100 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-brand-700">
@@ -540,31 +504,19 @@ export default function App(): JSX.Element {
                     initialValues={{
                       customerName: '',
                       principal: '',
-                      interestRate: 2.5,
                       interestRate: interestOptions[2],
-                      term: 6,
+                      daysBorrowed: 30,
                       date: getCurrentDateISO(),
                     }}
                     validationSchema={pawnValidationSchema}
                     onSubmit={async (values, helpers) => {
-                      await handlePawnSubmit(values);
-                      helpers.resetForm({
-                        values: {
-                          customerName: '',
-                          principal: '',
-                          interestRate: 2.5,
-                          term: 6,
-                          date: getCurrentDateISO(),
-                        },
-                      });
-                    onSubmit={(values, helpers) => {
-                      handlePawnSubmit(values, () =>
+                      await handlePawnSubmit(values, () =>
                         helpers.resetForm({
                           values: {
                             customerName: '',
                             principal: '',
                             interestRate: interestOptions[2],
-                            term: 6,
+                            daysBorrowed: 30,
                             date: getCurrentDateISO(),
                           },
                         }),
@@ -574,12 +526,10 @@ export default function App(): JSX.Element {
                   >
                     {({ values, setFieldValue, errors, touched }) => {
                       const principal = Number(values.principal) || 0;
-                      const interestRatePercent = Number(values.interestRate) || 0;
-                      const interestRate = interestRatePercent / 100;
                       const interestRate = Number(values.interestRate) || 0;
-                      const term = Number(values.term) || 0;
-                      const monthlyInterest = principal * interestRate;
-                      const totalPayable = principal + monthlyInterest * term;
+                      const daysBorrowed = Number(values.daysBorrowed) || 0;
+                      const interestAccrued = principal * (interestRate / 30) * daysBorrowed;
+                      const totalPayable = principal + interestAccrued;
 
                       return (
                         <Form className="mt-6 space-y-5">
@@ -614,22 +564,7 @@ export default function App(): JSX.Element {
                               )}
                             </div>
                             <div className="space-y-2">
-                              <label htmlFor="interestRate">Interest % (per month)</label>
-                              <input
-                                id="interestRate"
-                                name="interestRate"
-                                type="number"
-                                min="0"
-                                step="0.01"
-                                value={values.interestRate}
-                                onChange={(event) =>
-                                  setFieldValue(
-                                    'interestRate',
-                                    event.target.value === '' ? '' : Number(event.target.value),
-                                  )
-                                }
-                                aria-invalid={Boolean(touched.interestRate && errors.interestRate)}
-                              />
+                              <label htmlFor="interestRate">Interest rate (per month)</label>
                               <select
                                 id="interestRate"
                                 name="interestRate"
@@ -652,17 +587,21 @@ export default function App(): JSX.Element {
                           </div>
                           <div className="grid gap-4 sm:grid-cols-2">
                             <div className="space-y-2">
-                              <label htmlFor="term">Loan term (months)</label>
+                              <label htmlFor="daysBorrowed">Days borrowed</label>
                               <input
-                                id="term"
-                                name="term"
+                                id="daysBorrowed"
+                                name="daysBorrowed"
                                 type="number"
                                 min="1"
-                                value={values.term}
-                                onChange={(event) => setFieldValue('term', event.target.value ? Number(event.target.value) : '')}
-                                aria-invalid={Boolean(touched.term && errors.term)}
+                                value={values.daysBorrowed}
+                                onChange={(event) =>
+                                  setFieldValue('daysBorrowed', event.target.value ? Number(event.target.value) : '')
+                                }
+                                aria-invalid={Boolean(touched.daysBorrowed && errors.daysBorrowed)}
                               />
-                              {touched.term && errors.term && <p className="text-sm text-rose-600">{errors.term}</p>}
+                              {touched.daysBorrowed && errors.daysBorrowed && (
+                                <p className="text-sm text-rose-600">{errors.daysBorrowed}</p>
+                              )}
                             </div>
                             <div className="space-y-2">
                               <label htmlFor="date">Transaction date</label>
@@ -678,22 +617,22 @@ export default function App(): JSX.Element {
                             </div>
                           </div>
                           <div className="grid gap-4 rounded-xl border border-brand-200 bg-brand-50/70 p-4 sm:grid-cols-2">
-                            <div>
-                              <p className="text-xs uppercase tracking-wide text-brand-600">Monthly interest</p>
-                              <p className="text-lg font-semibold text-brand-900">
-                                {currencyFormatter.format(Number.isFinite(monthlyInterest) ? monthlyInterest : 0)}
-                              </p>
-                              <p className="text-xs text-brand-700">
-                                {percentFormatter.format(interestRate || 0)} of {currencyFormatter.format(principal || 0)}
-                              </p>
-                            </div>
-                            <div>
-                              <p className="text-xs uppercase tracking-wide text-brand-600">Total payable</p>
-                              <p className="text-lg font-semibold text-brand-900">
-                                {currencyFormatter.format(Number.isFinite(totalPayable) ? totalPayable : 0)}
-                              </p>
-                              <p className="text-xs text-brand-700">Includes all interest across {term || 0} months</p>
-                            </div>
+                              <div>
+                                <p className="text-xs uppercase tracking-wide text-brand-600">Accrued interest</p>
+                                <p className="text-lg font-semibold text-brand-900">
+                                  {currencyFormatter.format(Number.isFinite(interestAccrued) ? interestAccrued : 0)}
+                                </p>
+                                <p className="text-xs text-brand-700">
+                                  {percentFormatter.format(interestRate || 0)} monthly rate over {daysBorrowed || 0} days
+                                </p>
+                              </div>
+                              <div>
+                                <p className="text-xs uppercase tracking-wide text-brand-600">Total payable</p>
+                                <p className="text-lg font-semibold text-brand-900">
+                                  {currencyFormatter.format(Number.isFinite(totalPayable) ? totalPayable : 0)}
+                                </p>
+                                <p className="text-xs text-brand-700">Includes accrued interest for {daysBorrowed || 0} days</p>
+                              </div>
                           </div>
                           <button type="submit" className="w-full sm:w-auto">
                             Save pawn record
@@ -765,10 +704,10 @@ export default function App(): JSX.Element {
                         <th>Customer</th>
                         <th>Principal</th>
                         <th>Interest %</th>
-                        <th>Monthly interest</th>
+                        <th>Accrued interest</th>
                         <th>Total payable</th>
                         <th>Date</th>
-                        <th>Term</th>
+                        <th>Days borrowed</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -779,17 +718,24 @@ export default function App(): JSX.Element {
                           </td>
                         </tr>
                       ) : (
-                        sortedPawn.map((record) => (
-                          <tr key={record.id} className="odd:bg-white even:bg-slate-50">
-                            <td className="font-medium text-slate-800">{record.customerName}</td>
-                            <td>{currencyFormatter.format(record.principal)}</td>
-                            <td>{percentFormatter.format(record.interestRate)}</td>
-                            <td>{currencyFormatter.format(record.monthlyInterest)}</td>
-                            <td>{currencyFormatter.format(record.totalPayable)}</td>
-                            <td className="text-slate-500">{formatDateShort(record.date)}</td>
-                            <td>{record.term} mo</td>
-                          </tr>
-                        ))
+                        sortedPawn.map((record) => {
+                          const interestValue =
+                            typeof record.interestAccrued === 'number'
+                              ? record.interestAccrued
+                              : record.monthlyInterest * (record.term ?? 0);
+                          const daysHeld = record.daysBorrowed ?? record.term ?? 0;
+                          return (
+                            <tr key={record.id} className="odd:bg-white even:bg-slate-50">
+                              <td className="font-medium text-slate-800">{record.customerName}</td>
+                              <td>{currencyFormatter.format(record.principal)}</td>
+                              <td>{percentFormatter.format(record.interestRate)}</td>
+                              <td>{currencyFormatter.format(interestValue)}</td>
+                              <td>{currencyFormatter.format(record.totalPayable)}</td>
+                              <td className="text-slate-500">{formatDateShort(record.date)}</td>
+                              <td>{daysHeld} days</td>
+                            </tr>
+                          );
+                        })
                       )}
                     </tbody>
                   </table>
